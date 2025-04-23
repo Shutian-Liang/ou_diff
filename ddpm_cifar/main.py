@@ -16,9 +16,11 @@ def set_model(args):
         image_size=32,
         timesteps=1000,  # number of steps
         sampling_timesteps=1000,
+        beta_schedule = 'cosine',
         auto_normalize=False,  # whether to normalize the image
         # number of sampling timesteps (using ddim for faster inference [see citation for ddim paper])
         sigma = args.sigma,  # noise distribution
+        objective =args.objective,  # loss function
     ) 
     
     return diffusion
@@ -28,6 +30,7 @@ def main():
     diffusion = set_model(args)
     trainer = Trainer(diffusion, args)
     print(trainer.diffusion.sigma)
+    print(trainer.diffusion.objective)
     count_parameters(diffusion)
     trainer.train(args.epochs)
 

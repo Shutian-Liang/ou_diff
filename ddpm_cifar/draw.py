@@ -12,7 +12,7 @@ def imshow(img_tensor):
     img = np.transpose(img, (1, 2, 0))     # C,H,W -> H,W,C  
     return img  
 
-def show_images(images,epoch,std):  
+def show_images(images, objective, epoch, std):  
     """  
     images: tensor形状 (32, C, H, W)  
     """  
@@ -29,4 +29,4 @@ def show_images(images,epoch,std):
 
     plt.tight_layout()  
     # plt.show()  
-    plt.savefig(f'./images/epoch_{epoch}_std{std}.png')  # 保存图片
+    plt.savefig(f'./images/{objective}/epoch_{epoch}_std{std}.png')  # 保存图片

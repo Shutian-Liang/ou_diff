@@ -10,9 +10,10 @@ def get_arguments():
     # add parameters
     parser.add_argument('--sigma', type=float, default=1.0, help='noise distribution')
     parser.add_argument('--batchsize',type=int,default=64,help='Batch size')
-    parser.add_argument('--epochs', type=int, default=200, help='Number of epochs')
+    parser.add_argument('--epochs', type=int, default=300, help='Number of epochs')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
     parser.add_argument('--device', type=int, default=3, help='the device to use')
+    parser.add_argument('--objective', type=str, default='pred_x0', help='object to train on')
     args = parser.parse_args()
 
     # get arguments
@@ -26,7 +27,7 @@ def create_dataloader(batchsize):
     cifar10 = datasets.CIFAR10(root='./cifar10', train=True, download=False, transform=transform)
     
     # generate the dataloader
-    dataloader = DataLoader(cifar10, batch_size=batchsize, shuffle=True, num_workers=4)
+    dataloader = DataLoader(cifar10, batch_size=batchsize, shuffle=True, num_workers=4,pin_memory=True)
     return dataloader
 
 def count_parameters(model):

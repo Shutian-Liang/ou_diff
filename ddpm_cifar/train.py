@@ -19,6 +19,7 @@ class Trainer:
         self.device = 'cuda:'+str(args.device) if torch.cuda.is_available() else 'cpu'
         self.diffusion = diffusion.to(self.device)
         self.optimizer = optim.AdamW(self.diffusion.parameters(), lr=args.lr)
+        self.objective = args.objective
         
     def train(self, epochs):
         for epoch in range(epochs):
@@ -49,7 +50,7 @@ class Trainer:
             'epoch': epoch,
             'model_state_dict': self.diffusion.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
-        }, f'./models/model_{self.args.sigma}.pth')
+        }, f'./models/{self.objective}/model_{self.args.sigma}.pth')
         print(f'Model saved at epoch {epoch}')
     
     @torch.no_grad()
@@ -58,7 +59,7 @@ class Trainer:
         """
         self.diffusion.eval()
         images = self.diffusion.sample(self.args.batchsize)    
-        show_images(images, epoch, self.args.sigma)
+        show_images(images, self.objective, epoch, self.args.sigma)
         self.diffusion.train()
     
     
