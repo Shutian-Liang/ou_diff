@@ -2,6 +2,7 @@ import os
 import argparse
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
+from prettytable import PrettyTable
 # from torchvision.datasets import CIFAR10
 
 def get_arguments():
@@ -10,7 +11,7 @@ def get_arguments():
     parser.add_argument('--sigma', type=float, default=1.0, help='noise distribution')
     parser.add_argument('--batchsize',type=int,default=64,help='Batch size')
     parser.add_argument('--epochs', type=int, default=200, help='Number of epochs')
-    parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
+    parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
     parser.add_argument('--device', type=int, default=3, help='the device to use')
     args = parser.parse_args()
 
@@ -20,10 +21,23 @@ def get_arguments():
 def create_dataloader(batchsize):
     transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
     cifar10 = datasets.CIFAR10(root='./cifar10', train=True, download=False, transform=transform)
     
     # generate the dataloader
     dataloader = DataLoader(cifar10, batch_size=batchsize, shuffle=True, num_workers=4)
     return dataloader
+
+def count_parameters(model):
+    table = PrettyTable(["Modules", "Parameters"])
+    total_params = 0
+    for name, parameter in model.named_parameters():
+        if not parameter.requires_grad:
+            continue
+        params = parameter.numel()
+        table.add_row([name, params])
+        total_params += params
+    print(table)
+    print(f"Total Trainable Params: {total_params}")
+    return total_params

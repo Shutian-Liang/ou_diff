@@ -30,7 +30,6 @@ from accelerate import Accelerator
 
 from denoising_diffusion_pytorch.attend import Attend
 
-from denoising_diffusion_pytorch.version import __version__
 
 # constants
 
@@ -497,6 +496,8 @@ class GaussianDiffusion(Module):
         assert not (type(self) == GaussianDiffusion and model.channels != model.out_dim)
         assert not hasattr(model, 'random_or_learned_sinusoidal_cond') or not model.random_or_learned_sinusoidal_cond
 
+        # marginal distribution for the noise
+        self.sigma = sigma
         self.model = model
 
         self.channels = self.model.channels
@@ -675,7 +676,11 @@ class GaussianDiffusion(Module):
         b, *_, device = *x.shape, self.device
         batched_times = torch.full((b,), t, device = device, dtype = torch.long)
         model_mean, _, model_log_variance, x_start = self.p_mean_variance(x = x, t = batched_times, x_self_cond = x_self_cond, clip_denoised = False)
-        noise = torch.randn_like(x) if t > 0 else 0. # no noise if t == 0
+        
+        # adaptation : different marginal noise distribution
+        #noise = torch.randn_like(x) if t > 0 else 0. # no noise if t == 0
+        noise = torch.randn_like(x) * self.sigma if t > 0 else 0. # no noise if t == 0
+        
         pred_img = model_mean + (0.5 * model_log_variance).exp() * noise
         return pred_img, x_start
 
@@ -683,7 +688,9 @@ class GaussianDiffusion(Module):
     def p_sample_loop(self, shape, return_all_timesteps = False):
         batch, device = shape[0], self.device
 
-        img = torch.randn(shape, device = device)
+        # adaptation : different marginal noise distribution
+        #img = torch.randn(shape, device = device)
+        img = torch.randn(shape, device = device) * self.sigma
         imgs = [img]
 
         x_start = None
@@ -774,8 +781,10 @@ class GaussianDiffusion(Module):
 
     @autocast('cuda', enabled = False)
     def q_sample(self, x_start, t, noise = None):
-        noise = default(noise, lambda: torch.randn_like(x_start))
-
+        # adaptation : different marginal noise distribution
+        #noise = default(noise, lambda: torch.randn_like(x_start))
+        noise = default(noise, lambda: torch.randn_like(x_start) * self.sigma)
+        
         if self.immiscible:
             assign = self.noise_assignment(x_start, noise)
             noise = noise[assign]
@@ -787,9 +796,11 @@ class GaussianDiffusion(Module):
 
     def p_losses(self, x_start, t, noise = None, offset_noise_strength = None):
         b, c, h, w = x_start.shape
-
-        noise = default(noise, lambda: torch.randn_like(x_start))
-
+        
+        # adaptation : different marginal noise distribution
+        # noise = default(noise, lambda: torch.randn_like(x_start))
+        noise = default(noise, lambda: torch.randn_like(x_start) * self.sigma)  
+        
         # offset noise - https://www.crosslabs.org/blog/diffusion-with-offset-noise
 
         offset_noise_strength = default(offset_noise_strength, self.offset_noise_strength)

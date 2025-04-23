@@ -41,7 +41,7 @@ class Trainer:
             self.save_model(epoch)
             self.validate(epoch)
     
-    @torch.no_grad()
+    # @torch.no_grad()
     def save_model(self, epoch):
         """save the model and the optimizer state and epoch
         """
@@ -49,7 +49,7 @@ class Trainer:
             'epoch': epoch,
             'model_state_dict': self.diffusion.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
-        }, f'./models/model.pth')
+        }, f'./models/model_{self.args.sigma}.pth')
         print(f'Model saved at epoch {epoch}')
     
     @torch.no_grad()
