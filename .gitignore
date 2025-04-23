@@ -1,4 +1,5 @@
 *.ipynb
+cond_unet/dataset/
 ddpm_cifar/cifar10/
 ddpm_cifar/models/
 ddpm_cifar/images/
