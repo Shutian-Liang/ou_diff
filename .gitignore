@@ -9,3 +9,4 @@ cond_unet/models/
 ddpm_cifar/cifar10/
 ddpm_cifar/models/
 ddpm_cifar/images/
+ddpm_cifar/logfiles/
