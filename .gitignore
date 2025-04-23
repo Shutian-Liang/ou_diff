@@ -1,5 +1,10 @@
 *.ipynb
-cond_unet/dataset/
+
+# latent diffusion models
+cond_unet/ucf101/
+cond_unet/latent-diffusion/
+
+# ddpm cifar10
 ddpm_cifar/cifar10/
 ddpm_cifar/models/
 ddpm_cifar/images/
