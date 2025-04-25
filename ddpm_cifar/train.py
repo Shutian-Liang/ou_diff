@@ -61,5 +61,13 @@ class Trainer:
         images = self.diffusion.sample(self.args.batchsize)    
         show_images(images, self.objective, epoch, self.args.sigma)
         self.diffusion.train()
-    
-    
+
+    def load_model(self):
+        """load the model"""
+        checkpoint = torch.load(f'./models/{self.objective}/model_{self.args.sigma}.pth', map_location=self.device)
+        
+        self.diffusion.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        epoch = checkpoint['epoch']
+        print(f'Model loaded from epoch {epoch}',f'{self.objective}/model_{self.args.sigma}.pth')
+        return epoch

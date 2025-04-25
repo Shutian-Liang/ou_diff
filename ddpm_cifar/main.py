@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from utils import get_arguments, count_parameters
 from train import Trainer
+from evaluating import img_sampler
 from denoising_diffusion_pytorch import Unet, GaussianDiffusion
 
 def set_model(args):
@@ -25,7 +26,7 @@ def set_model(args):
     
     return diffusion
     
-def main():
+def train():
     args = get_arguments()
     diffusion = set_model(args)
     trainer = Trainer(diffusion, args)
@@ -34,6 +35,18 @@ def main():
     count_parameters(diffusion)
     trainer.train(args.epochs)
 
+def generate():
+    args = get_arguments()
+    diffusion = set_model(args)
+    trainer = Trainer(diffusion, args)
+    epoch = trainer.load_model()
+    sampler = img_sampler(trainer.diffusion, args)
+    dataset = sampler.create_dataset(num_samples=50000//args.batchsize)
+    sampler.save_images(dataset)
+    print(f'Images saved to {args.objective}/{args.sigma}/')
+    
+
 if __name__ == '__main__':
-    main()
+    # train() train for training
+    generate()  # generate for generating    
     

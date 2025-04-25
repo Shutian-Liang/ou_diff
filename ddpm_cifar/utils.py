@@ -4,7 +4,13 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from prettytable import PrettyTable
 # from torchvision.datasets import CIFAR10
-
+class Namespace:  
+    def __init__(self, **kwargs):  
+        """
+        use this class to create a namespace in jupyter notebook for debugging
+        """
+        self.__dict__.update(kwargs)    
+        
 def get_arguments():
     parser = argparse.ArgumentParser()
     # add parameters
