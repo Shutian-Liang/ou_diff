@@ -1,11 +1,13 @@
-import os  
+import os
+import json  
 from PIL import Image  
 import torch 
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as transforms
-from torch.utils.data import DataLoader, TensorDataset  
+from torch.utils.data import DataLoader, TensorDataset 
+from pytorch_fid import fid_score
 from tqdm import tqdm
 
 class img_sampler:
@@ -62,6 +64,24 @@ class img_sampler:
                 pil_img = pil_img.resize((299,299), resample=Image.BICUBIC)
                 pil_img.save(os.path.join(save_dir, f'{batch_idx*64 + i}.png'))
     
-
-
+    def calculate_fid(self, dataset):
+        """calculate the fid score
+        Args:
+            dataset: the dataset to calculate
+        return: the fid score
+        """
+        # load the dataset
+        real_image_folder = './cifar10/evaluated/cifar10/'
+        generated_images_folder = f'./cifar10/evaluated/{self.objective}/{self.sigma}/'
+        # calculate the fid score
+        fid = fid_score.calculate_fid_given_paths([real_image_folder, generated_images_folder], 64, self.device, 2048)
+        
+        # save the fid score
+        fid_score_path = f'./cifar10/evaresults/{self.objective}/{self.sigma}/fid_score.json'
+        if not os.path.exists(os.path.dirname(fid_score_path)):
+            os.makedirs(os.path.dirname(fid_score_path))
+        with open(fid_score_path, 'w') as f:
+            json.dump({'fid_score': fid}, f)
+        print(f'FID: {fid}')
+        print(f'FID score saved to {fid_score_path}')
 

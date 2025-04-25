@@ -41,10 +41,9 @@ def generate():
     trainer = Trainer(diffusion, args)
     epoch = trainer.load_model()
     sampler = img_sampler(trainer.diffusion, args)
-    dataset = sampler.create_dataset(num_samples=50000//args.batchsize)
+    dataset = sampler.create_dataset(num_samples=20000//args.batchsize)
     sampler.save_images(dataset)
     print(f'Images saved to {args.objective}/{args.sigma}/')
-    
 
 if __name__ == '__main__':
     # train() train for training
