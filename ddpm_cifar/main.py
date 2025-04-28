@@ -45,7 +45,12 @@ def generate():
     sampler.save_images(dataset)
     print(f'Images saved to {args.objective}/{args.sigma}/')
 
+def evaluate():
+    args = get_arguments()
+    sampler = img_sampler(None, args)
+    sampler.calculate_fid()
+    
 if __name__ == '__main__':
     # train() train for training
-    generate()  # generate for generating    
-    
+    #generate()  # generate for generating    
+    evaluate()  # evaluate for evaluating

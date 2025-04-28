@@ -20,6 +20,8 @@ class img_sampler:
         self.diffusion = diffusion
         self.args = args
         self.device = 'cuda:'+str(args.device) if torch.cuda.is_available() else 'cpu'
+        self.objective = args.objective
+        self.sigma = args.sigma
         
         # set the transform
         self.transform = transforms.Compose([
@@ -64,7 +66,7 @@ class img_sampler:
                 pil_img = pil_img.resize((299,299), resample=Image.BICUBIC)
                 pil_img.save(os.path.join(save_dir, f'{batch_idx*64 + i}.png'))
     
-    def calculate_fid(self, dataset):
+    def calculate_fid(self):
         """calculate the fid score
         Args:
             dataset: the dataset to calculate
@@ -74,7 +76,7 @@ class img_sampler:
         real_image_folder = './cifar10/evaluated/cifar10/'
         generated_images_folder = f'./cifar10/evaluated/{self.objective}/{self.sigma}/'
         # calculate the fid score
-        fid = fid_score.calculate_fid_given_paths([real_image_folder, generated_images_folder], 64, self.device, 2048)
+        fid = fid_score.calculate_fid_given_paths([real_image_folder, generated_images_folder], 32, self.device, 2048)
         
         # save the fid score
         fid_score_path = f'./cifar10/evaresults/{self.objective}/{self.sigma}/fid_score.json'
