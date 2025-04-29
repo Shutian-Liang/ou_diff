@@ -4,6 +4,9 @@
 cond_unet/UCF101/
 cond_unet/latent-diffusion/
 cond_unet/models/
+cond_unet/taming/
+cond_unet/videos/
+cond_unet/__pycache__
 
 # ddpm cifar10
 ddpm_cifar/cifar10/
