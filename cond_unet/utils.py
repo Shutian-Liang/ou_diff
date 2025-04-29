@@ -17,6 +17,7 @@ def get_arguments():
     """
     parser = argparse.ArgumentParser()
     # ou noise parameters
+    parser.add_argument('--noise', type=str, default='ou', choices=['ou','gaussian'], help='Type of noise to use')
     parser.add_argument('--theta', type=float, default=1.0, help='Theta parameter for OU noise')
     parser.add_argument('--D', type=float, default=1.0, help='Sigma^2/2 parameter for OU noise')
     parser.add_argument('--dt', type=float, default=0.01, help='Time step for OU noise')
@@ -35,7 +36,7 @@ def get_arguments():
     parser.add_argument('--side_size', type=int, default=64, help='Size of the side of the image')
     parser.add_argument('--subset', type=int, default=1, choices=[0,1], help='Use subset of the dataset')
     parser.add_argument('--random_seed', type=int, default=0, help='Random seed for sampling')
-    parser.add_argument('--num_samples', type=int, default=30, help='Number of samples to sample')
+    parser.add_argument('--num_samples', type=int, default=5, help='Number of samples to sample')
     parser.add_argument('--pictures', type=int, default=0, choices=[0,1], help='Use pictures of the dataset')
     parser.add_argument('--workers', type=int, default=4, help='Number of workers for data loading')
     
@@ -62,7 +63,7 @@ class UCF():
             # CenterCrop(356),
             Resize((self.side_size, self.side_size)),
             Lambda(lambda x: torch.clamp(x, 0.0, 1.0)),
-            Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+            Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)) 
         ])
         self.data = self.get_data()
         self.train_data_len = len(self.data)
@@ -170,3 +171,20 @@ def count_parameters(model):
     print(table)
     print(f"Total Trainable Params: {total_params}")
     return total_params
+
+def checkandcreate(path):
+    """
+    check if the path exists, if not create it
+    """
+    if not os.path.exists(path):
+        os.makedirs(path)
+        print(f'Created directory {path}')
+    else:
+        print(f'Directory {path} already exists')
+
+class Namespace:  
+    def __init__(self, **kwargs):  
+        """
+        use this class to create a namespace in jupyter notebook for debugging
+        """
+        self.__dict__.update(kwargs)    
