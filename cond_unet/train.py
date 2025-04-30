@@ -14,7 +14,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(-1, os.path.join(current_dir, 'latent-diffusion/')) 
 from ldm.models.autoencoder import AutoencoderKL, VQModelInterface 
 
-class trainer:
+class Trainer:
     def __init__(self, diffusion, args, dataloading=None):
         """initialize the trainer on pixel level
         Args:
@@ -35,6 +35,20 @@ class trainer:
         # for simple trainer dont use the vae encoder
         self.latent = False 
     
+    @staticmethod
+    def gethints(videos):
+        """set the first frame as the hints for different batches
+        Args:
+            videos: videos to be denoised shaped [b, f, c, h, w]
+        """
+        # shaped [b, 1, c, h, w] not using gradient of raw videos
+        first_frame = videos[:, 0:1, :, :, :].clone()  
+
+        # expand to [b, frames, c, h, w] with shared gradients  
+        hints = first_frame.expand(-1, 16, -1, -1, -1)
+        
+        return hints
+    
     def train(self, epochs):
         """train the diffusion model
         Args:
@@ -43,6 +57,7 @@ class trainer:
         for epoch in range(epochs):
             # using tqdm to show the progress bar
             for i, (videos, _) in enumerate(self.dataloader):
+                hints = self.gethints(videos)
                 loss = self.forward(videos, latent=self.latent)
 
                 # backward pass
@@ -102,7 +117,7 @@ class trainer:
         show_videos(videos, frames=self.args.frames, title=self.noise, path=path)
         self.diffusion.train()
 
-class LDMTrainer(trainer):
+class LDMTrainer(Trainer):
     def __init__(self, diffusion, args, dataloading=None):
         """initialize the ldm trainer
         Args:
