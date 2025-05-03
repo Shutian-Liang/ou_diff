@@ -187,7 +187,7 @@ class Unet(Module):
             sinu_pos_emb = SinusoidalPosEmb(dim, theta = sinusoidal_pos_emb_theta)
             fourier_dim = dim
 
-        self.time_mlp = nn.Sequential(
+        self.time_mlp = nn.Sequential( 
             sinu_pos_emb,
             nn.Linear(fourier_dim, time_dim),
             nn.GELU(),
@@ -348,6 +348,7 @@ class GaussianDiffusion(Module):
         model,
         *,
         image_size,
+        args,
         timesteps = 1000,
         sampling_timesteps = None,
         objective = 'pred_v',
@@ -359,19 +360,22 @@ class GaussianDiffusion(Module):
         min_snr_loss_weight = False, # https://arxiv.org/abs/2303.09556
         min_snr_gamma = 5,
         immiscible = False,
-        sigma = 1.0
+        index = True,
     ):
         super().__init__()
         assert not (type(self) == GaussianDiffusion and model.channels != model.out_dim)
         assert not hasattr(model, 'random_or_learned_sinusoidal_cond') or not model.random_or_learned_sinusoidal_cond
 
+        # ou parameters 
+        self.args = args
+        self.noise = self.args.noise
+        self.device = 'cuda:'+str(self.args.device) if torch.cuda.is_available() else 'cpu'
+        
         # marginal distribution for the noise
-        self.sigma = sigma
         self.model = model
-
         self.channels = self.model.channels
         self.self_condition = self.model.self_condition
-
+    
         if isinstance(image_size, int):
             image_size = (image_size, image_size)
         assert isinstance(image_size, (tuple, list)) and len(image_size) == 2, 'image size must be a integer or a tuple/list of two integers'
@@ -463,14 +467,17 @@ class GaussianDiffusion(Module):
         elif objective == 'pred_v':
             register_buffer('loss_weight', maybe_clipped_snr / (snr + 1))
 
+                # index list
+        self.index_list = torch.arange(self.args.frames).repeat(self.args.batchsize).to(self.device) # frames
+           
         # auto-normalization of data [0, 1] -> [-1, 1] - can turn off by setting it to be False
 
         self.normalize = normalize_to_neg_one_to_one if auto_normalize else identity
         self.unnormalize = unnormalize_to_zero_to_one if auto_normalize else identity
 
-    @property
-    def device(self):
-        return self.betas.device
+    # @property
+    # def device(self):
+    #     return self.betas.device
 
     def predict_start_from_noise(self, x_t, t, noise):
         return (
@@ -505,8 +512,31 @@ class GaussianDiffusion(Module):
         posterior_log_variance_clipped = extract(self.posterior_log_variance_clipped, t, x_t.shape)
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
-    def model_predictions(self, x, t, x_self_cond = None, clip_x_start = False, rederive_pred_noise = False):
-        model_output = self.model(x, t, x_self_cond)
+    def ou_noise(self, x_start):
+        B, c, h, w = x_start.shape
+        device = x_start.device
+
+        frames = self.ou_params['frames']
+        b = B // frames
+        noise = torch.randn(b, c, h, w, device=device)
+
+        # OU过程生成噪声序列
+        ou_noise = [noise]
+        theta, dt, D = self.args.theta, self.args.dt, self.args.D
+        gamma = math.exp(-theta * dt)
+        for _ in range(frames - 1):
+            noise = gamma * noise + math.sqrt(D / theta * (1 - gamma ** 2)) * torch.randn_like(noise)
+            ou_noise.append(noise)
+
+        # 整理输出形状
+        ou_noise = torch.stack(ou_noise, axis = 1)  # 合并噪声，形状为 (o_length, b, c, h, w)
+        # ou_noise = ou_noise.permute(1, 0, 2, 3, 4)  # 形状为 (b,o_length, c, h, w)
+        # ou_noise = ou_noise.reshape(B, c, h, w)  # 恢复为 (B, c, h, w)
+        ou_noise = rearrange(ou_noise, 'b f c h w -> (b f) c h w', f=frames)  # 恢复为 (B, c, h, w)
+        return ou_noise
+        
+    def model_predictions(self, x, t, index=None, frames=None, x_self_cond = None, clip_x_start = False, rederive_pred_noise = False):
+        model_output = self.model(x, t, index, frames, x_self_cond)
         maybe_clip = partial(torch.clamp, min = -1., max = 1.) if clip_x_start else identity
 
         if self.objective == 'pred_noise':
@@ -530,8 +560,8 @@ class GaussianDiffusion(Module):
 
         return ModelPrediction(pred_noise, x_start)
 
-    def p_mean_variance(self, x, t, x_self_cond = None, clip_denoised = False):
-        preds = self.model_predictions(x, t, x_self_cond)
+    def p_mean_variance(self, x, t, index = None, frames = None, x_self_cond = None, clip_denoised = False):
+        preds = self.model_predictions(x, t, index, frames, x_self_cond)
         x_start = preds.pred_x_start
 
         if clip_denoised:
@@ -541,32 +571,42 @@ class GaussianDiffusion(Module):
         return model_mean, posterior_variance, posterior_log_variance, x_start
 
     @torch.inference_mode()
-    def p_sample(self, x, t: int, x_self_cond = None):
+    def p_sample(self, x, t: int, index = None, frames = None, x_self_cond = None):
         b, *_, device = *x.shape, self.device
         batched_times = torch.full((b,), t, device = device, dtype = torch.long)
-        model_mean, _, model_log_variance, x_start = self.p_mean_variance(x = x, t = batched_times, x_self_cond = x_self_cond, clip_denoised = False)
+        model_mean, _, model_log_variance, x_start = self.p_mean_variance(x = x, t = batched_times, index=index, frames=frames, x_self_cond = x_self_cond, clip_denoised = False)
         
         # adaptation : different marginal noise distribution
         #noise = torch.randn_like(x) if t > 0 else 0. # no noise if t == 0
-        noise = torch.randn_like(x) * self.sigma if t > 0 else 0. # no noise if t == 0
+        if self.noise == 'gaussian':
+            noise = torch.randn_like(x)  if t > 0 else 0. # no noise if t == 0
+        elif self.noise == 'ou':
+            noise = self.ou_noise(x_start) if t > 0 else 0.
+        else:
+            raise ValueError(f'unknown noise type {self.noise}')
         
         pred_img = model_mean + (0.5 * model_log_variance).exp() * noise
         return pred_img, x_start
 
     @torch.inference_mode()
-    def p_sample_loop(self, shape, return_all_timesteps = False):
+    def p_sample_loop(self, shape, frames=None, using_index=True, return_all_timesteps = False):
         batch, device = shape[0], self.device
 
         # adaptation : different marginal noise distribution
         #img = torch.randn(shape, device = device)
-        img = torch.randn(shape, device = device) * self.sigma
+        if self.noise == 'gaussian':
+            img = torch.randn(shape, device = device) 
+        elif self.noise == 'ou':
+            img = self.ou_noise(torch.randn(shape, device = device))
         imgs = [img]
 
         x_start = None
-
+        index_list = None
+        if using_index:
+            index_list = self.index_list
         for t in tqdm(reversed(range(0, self.num_timesteps)), desc = 'sampling loop time step', total = self.num_timesteps):
             self_cond = x_start if self.self_condition else None
-            img, x_start = self.p_sample(img, t, self_cond)
+            img, x_start = self.p_sample(img, t, index=index_list, frames=frames, x_self_cond=self_cond)
             imgs.append(img)
 
         ret = img if not return_all_timesteps else torch.stack(imgs, dim = 1)
@@ -617,10 +657,10 @@ class GaussianDiffusion(Module):
         return ret
 
     @torch.inference_mode()
-    def sample(self, batch_size = 16, return_all_timesteps = False):
+    def sample(self, frames=None, batch_size = 512, return_all_timesteps = False):
         (h, w), channels = self.image_size, self.channels
         sample_fn = self.p_sample_loop if not self.is_ddim_sampling else self.ddim_sample
-        return sample_fn((batch_size, channels, h, w), return_all_timesteps = return_all_timesteps)
+        return sample_fn(shape=(batch_size, channels, h, w), using_index=True, frames=frames, return_all_timesteps = return_all_timesteps)
 
     @torch.inference_mode()
     def interpolate(self, x1, x2, t = None, lam = 0.5):
@@ -652,7 +692,10 @@ class GaussianDiffusion(Module):
     def q_sample(self, x_start, t, noise = None):
         # adaptation : different marginal noise distribution
         #noise = default(noise, lambda: torch.randn_like(x_start))
-        noise = default(noise, lambda: torch.randn_like(x_start) * self.sigma)
+        if self.noise == 'gaussian':
+            noise = default(noise, lambda: torch.randn_like(x_start))
+        elif self.noise == 'ou':
+            noise = default(noise, lambda: self.ou_noise(x_start))
         
         if self.immiscible:
             assign = self.noise_assignment(x_start, noise)
@@ -663,12 +706,15 @@ class GaussianDiffusion(Module):
             extract(self.sqrt_one_minus_alphas_cumprod, t, x_start.shape) * noise
         )
 
-    def p_losses(self, x_start, t, noise = None, offset_noise_strength = None):
+    def p_losses(self, x_start, t, usingindex=True, frames=None, noise = None, offset_noise_strength = None):
         b, c, h, w = x_start.shape
         
         # adaptation : different marginal noise distribution
         # noise = default(noise, lambda: torch.randn_like(x_start))
-        noise = default(noise, lambda: torch.randn_like(x_start) * self.sigma)  
+        if self.noise == 'gaussian':
+            noise = default(noise, lambda: torch.randn_like(x_start))  
+        elif self.noise == 'ou':
+            noise = default(noise, lambda: self.ou_noise(x_start))
         
         # offset noise - https://www.crosslabs.org/blog/diffusion-with-offset-noise
 
@@ -693,8 +739,10 @@ class GaussianDiffusion(Module):
                 x_self_cond.detach_()
 
         # predict and take gradient step
-
-        model_out = self.model(x, t, x_self_cond)
+        index = None
+        if usingindex:
+            index = self.index_list
+        model_out = self.model(x=x, time=t, index=index, frame=frames, x_self_cond=x_self_cond)
 
         if self.objective == 'pred_noise':
             target = noise
@@ -712,13 +760,13 @@ class GaussianDiffusion(Module):
         loss = loss * extract(self.loss_weight, t, loss.shape)
         return loss.mean()
 
-    def forward(self, img, *args, **kwargs):
+    def forward(self, img, usingindex=True, frames=None, *args, **kwargs):
         b, c, h, w, device, img_size, = *img.shape, img.device, self.image_size
         assert h == img_size[0] and w == img_size[1], f'height and width of image must be {img_size}'
         t = torch.randint(0, self.num_timesteps, (b,), device=device).long()
 
         img = self.normalize(img)
-        return self.p_losses(img, t, *args, **kwargs)
+        return self.p_losses(img, t, usingindex, frames, *args, **kwargs)
 
 # dataset classes
 

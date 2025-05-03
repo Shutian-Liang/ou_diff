@@ -25,7 +25,8 @@ class Trainer:
         self.args = args
         if dataloading:
             data = UCF(self.args)
-            self.dataloader = data.load_data()
+            self.trainloader, self.testloader = data.load_data()
+        self.testfiles = iter(self.testloader)
         self.device = 'cuda:'+str(args.device) if torch.cuda.is_available() else 'cpu'
         self.diffusion = diffusion.to(self.device)
         self.optimizer = optim.AdamW(self.diffusion.parameters(), lr=args.lr)
@@ -56,7 +57,7 @@ class Trainer:
         """
         for epoch in range(epochs):
             # using tqdm to show the progress bar
-            for i, (videos, _) in enumerate(self.dataloader):
+            for i, (videos, _) in enumerate(self.trainloader):
                 hints = self.gethints(videos)
                 loss = self.forward(videos, latent=self.latent)
 
@@ -72,7 +73,7 @@ class Trainer:
             self.save_model(epoch, self.latent)
             self.validate(epoch, self.latent)
     
-    def forward(self, videos, latent=False):
+    def forward(self, videos, hints, latent=False):
         """forward pass of the model
         Args:
             videos: the input tensor of shape [b*f, c, h, w]
@@ -81,9 +82,12 @@ class Trainer:
             loss: the loss value
         """
         videos = videos.to(self.device)
+        hints = hints.to(self.device)
         videos = rearrange(videos, 'b f c h w -> (b f) c h w', f=self.args.frames)
+        hints = rearrange(hints, 'b f c h w -> (b f) c h w', f=self.args.frames)
         if latent:
             videos = self.vae.encode(videos)
+            hints = self.vae.encode(hints)
         loss = self.diffusion(videos)
         return loss
      
@@ -108,10 +112,11 @@ class Trainer:
         """validate the model
         """
         self.diffusion.eval()
+        hints = next(self.testfiles).expand(-1, 16, -1, -1, -1)
         videos = self.diffusion.sample(self.args.batchsize)
-        videos = rearrange(videos, '(b f) c h w -> b f c h w', f=self.args.frames)
         if latent:
             videos = self.vae.decode(videos,self.args.t)
+        videos = rearrange(videos, '(b f) c h w -> b f c h w', f=self.args.frames)
         enc = 'vae' if self.latent else 'pixel'
         path = f'./images/{self.objective}/{enc}/{self.noise}/epoch{epoch}.png'
         show_videos(videos, frames=self.args.frames, title=self.noise, path=path)

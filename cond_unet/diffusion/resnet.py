@@ -71,7 +71,7 @@ class ResBlock2d(nn.Module):
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
 
         self.shortcut = nn.Identity()
-        self.linear = nn.Linear(planes*size**2, dim)
+        self.linear = nn.Linear(planes*size**2, dim*4)
         if stride != 1 or in_planes != self.expansion * planes:
             self.shortcut = nn.Sequential(
                 nn.Conv2d(in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=False),
@@ -82,5 +82,6 @@ class ResBlock2d(nn.Module):
         out = self.conv2(out)
         out += self.shortcut(x)
         out = self.activation(out)
+        out = out.view(out.size(0), -1)
         out = self.linear(out)
         return out

@@ -10,17 +10,18 @@ from einops import rearrange, reduce, repeat
 from einops.layers.torch import Rearrange
 
 # self defind functions in scripts
-from denoising_diffusion_pytorch import (default,cast_tuple,divisible_by,
+from .denoising_diffusion_pytorch import (default,cast_tuple,divisible_by,
         SinusoidalPosEmb,RandomOrLearnedSinusoidalPosEmb,Upsample,Downsample,Unet)                
 from .attention import RMSNorm, SinusoidalPosEmb, RandomOrLearnedSinusoidalPosEmb, LinearAttention, Attention
 from .resnet import ResnetBlock, ResBlock2d
 
-class CondUnet:
+class CondUnet(Module):
     def __init__(
         self,
         dim,
-        index,
         size,
+        usingindex=True,
+        usingframe=True,
         init_dim = None,
         out_dim = None,
         dim_mults = (1, 2, 4, 8),
@@ -37,6 +38,7 @@ class CondUnet:
         full_attn = None,    # defaults to full attention only for inner most layer
         flash_attn = False
     ):
+        super().__init__()
         # determine dimensions
         self.channels = channels
         self.self_condition = self_condition
@@ -65,7 +67,8 @@ class CondUnet:
         )
         
         # index embeddings
-        self.index = index # whether using the index embedding
+        self.usingindex = usingindex # whether using the index embedding
+        self.usingframe = usingframe # whether using the frame embedding
         index_dim = dim 
         index_pos_emb = RandomOrLearnedSinusoidalPosEmb(learned_sinusoidal_dim, random_fourier_features)
         index_fourier_dim = learned_sinusoidal_dim + 1
@@ -77,13 +80,13 @@ class CondUnet:
         )
         
         # frame condition
-        pixel_dim = dim * 4
+        pixel_dim = dim*4
         self.size = size # the pixel shape
         self.frame_conv = ResBlock2d(self.channels, 2*self.channels, size=self.size)
         
         
         # set emb_dim
-        self.emb_dim = time_dim + index_dim + pixel_dim if self.index else time_dim + pixel_dim
+        self.emb_dim = time_dim + index_dim + pixel_dim if self.usingindex else time_dim + pixel_dim
         
         ###################### attention and layers####################
         if not full_attn:
@@ -99,7 +102,7 @@ class CondUnet:
         # prepare blocks
 
         FullAttention = partial(Attention, flash = flash_attn)
-        resnet_block = partial(ResnetBlock, time_emb_dim = self.emb_dim)
+        resnet_block = partial(ResnetBlock, emb_dim = self.emb_dim)
 
         # layers
 
@@ -146,7 +149,7 @@ class CondUnet:
     def downsample_factor(self):
         return 2 ** (len(self.downs) - 1)
 
-    def forward(self, x, time, x_self_cond = None):
+    def forward(self, x, time, index, frames, x_self_cond = None):
         assert all([divisible_by(d, self.downsample_factor) for d in x.shape[-2:]]), f'your input dimensions {x.shape[-2:]} need to be divisible by {self.downsample_factor}, given the unet'
 
         if self.self_condition:
@@ -158,9 +161,14 @@ class CondUnet:
 
         # completely concate together
         t = self.time_mlp(time)
-        index = self.index_mlp(index)
-        frame = self.frame_conv(index)
-        t = torch.cat([t,index,frame],axis=1)
+        #print("time shape: ", t.shape)
+        if self.usingindex:
+            index = self.index_mlp(index)
+            #print("index shape: ", index.shape)
+        if self.usingframe:
+            frames = self.frame_conv(frames)
+            #print("frame shape: ", frame.shape)
+        t = torch.cat([t,index,frames],axis=1)
 
         h = []
 

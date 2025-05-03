@@ -65,18 +65,25 @@ class UCF():
             Lambda(lambda x: torch.clamp(x, 0.0, 1.0)),
             Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)) 
         ])
-        self.data = self.get_data()
-        self.train_data_len = len(self.data)
+        self.train_data, self.test_data = self.get_data()
+        self.train_data_len = len(self.train_data)
         
-    def make_subset(self):
+    def make_subset(self, train=True):
+        """
+        make a subset of the dataset
+        params:
+            train: whether to make a subset of the training set or not
+        """
         random.seed(self.random_seed)
 
         # 设置路径  
         source_path = './UCF101/UCF-101/'  
+        datatype = 'train' if train else 'test'
+        
         if not self.pictures:
-            target_path = './UCF101/UCF-101_sample/'  
+            target_path = './UCF101/UCF-101_' + datatype + '/'
         else:
-            target_path = './UCF101/UCF-101_sample_pictures/'
+            target_path = './UCF101/UCF-101_pictures_' + datatype + '/'
 
         # 获取所有类别文件夹  
         folders = [f for f in os.listdir(source_path) if os.path.isdir(os.path.join(source_path, f))]  
@@ -93,7 +100,7 @@ class UCF():
 
         #抽样并复制文件  
         sample_num = self.num_samples
-        with open('./UCF101/ucfTrainTestlist/trainlist01.txt') as f:
+        with open(f'./UCF101/ucfTrainTestlist/{datatype}list01.txt') as f:
             lines = f.readlines()
         lines = [line.strip() for line in lines]
         lines = [line.split(' ')[0] for line in lines]
@@ -114,16 +121,18 @@ class UCF():
     def get_data(self):
         if not self.subset:
             # full dataset
-            root = self.path + 'UCF-101/'
+            train_root = self.path + 'UCF-101/'
         else:
             # subset
             self.make_subset()
+            self.make_subset(train=False)
             if self.pictures:
-                root = self.path + 'UCF-101_sample_pictures/'
+                train_root = self.path + 'UCF-101_pictures_train/'
             else:
-                root = self.path + 'UCF-101_sample/'
-        data = UCF101(
-            root=root,  # subset数据集路径
+                train_root = self.path + 'UCF-101_train/'
+                test_root = self.path + 'UCF-101_test/'   
+        train_data = UCF101(
+            root=train_root,  # subset数据集路径
             annotation_path=self.path + 'ucfTrainTestlist',  # 注释文件路径
             frames_per_clip=self.frames,  # 提取每个 clip 的帧数
             step_between_clips=self.step_between_clips,  # 每帧的间隔
@@ -131,7 +140,17 @@ class UCF():
             transform=self.transforms,  # 帧级变换
             num_workers=4
         )
-        return data           
+        
+        test_data = UCF101(
+            root=test_root,  # subset数据集路径
+            annotation_path=self.path + 'ucfTrainTestlist',  # 注释文件路径
+            frames_per_clip=1,  # as the hints
+            step_between_clips=self.step_between_clips,  # 每帧的间隔
+            train=False,  # 加载训练集 (False 则加载测试集)
+            transform=self.transforms,  # 帧级变换
+            num_workers=4
+        )
+        return train_data, test_data          
         
     def load_data(self):
         def custom_collate(batchsize):
@@ -143,9 +162,11 @@ class UCF():
         # Reset random seed to None for shuffling
         random.seed(None)
         torch.manual_seed(torch.initial_seed())
-        train_loader = DataLoader(self.data, batch_size=self.batchsize, shuffle=True, num_workers=8, pin_memory=True,
+        train_loader = DataLoader(self.train_data, batch_size=self.batchsize, shuffle=True, num_workers=4, pin_memory=True,
                                   collate_fn=custom_collate, drop_last=True)
-        return train_loader
+        test_loader = DataLoader(self.test_data, batch_size=self.batchsize, shuffle=True, num_workers=4, pin_memory=True,
+                                  collate_fn=custom_collate, drop_last=True)
+        return train_loader, train_loader
 
     def reshape_input(self, videos):
         # raw shape [b,T,c,H,W]

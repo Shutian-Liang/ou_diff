@@ -1,3 +1,3 @@
 # from diffusion.unets import CondUnet
-from .denoising_diffusion_pytorch import GaussianDiffusion, Unet
-
+from diffusion.denoising_diffusion_pytorch import GaussianDiffusion, Unet
+from diffusion.unets import CondUnet
