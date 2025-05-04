@@ -97,14 +97,14 @@ class Trainer:
             epoch: the current epoch
         """
         enc = 'vae' if latent else 'pixel'
-        path = f'./models/{self.objective}/{enc}/{self.noise}.pth'
+        path = f'./models/{self.objective}/{enc}/'
         checkandcreate(path)
         torch.save({
             'epoch': epoch,
             'args': self.args,
             'model_state_dict': self.diffusion.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
-        }, path)
+        }, path+f'{self.noise}.pth')
         print(f'Model saved at epoch {epoch}')
     
     @torch.no_grad()
@@ -117,9 +117,12 @@ class Trainer:
         """
         self.diffusion.eval()
         hints_seen = hints.clone().to(self.device)
-        hints_seen = rearrange(hints, 'b f c h w -> (b f) c h w', f=self.args.frames)
-        hints_noseen = next(self.testfiles).expand(-1, 16, -1, -1, -1).to(self.device)
-        hints_noseen = rearrange(hints, 'b f c h w -> (b f) c h w', f=self.args.frames)
+        hints_seen = rearrange(hints_seen, 'b f c h w -> (b f) c h w', f=self.args.frames)
+        print(hints_seen.device)
+        
+        hints_noseen = next(self.testfiles)[0].to(self.device).expand(-1, 16, -1, -1, -1)
+        hints_noseen = rearrange(hints_noseen, 'b f c h w -> (b f) c h w', f=self.args.frames)
+        print(hints_noseen.device)
         videos_seen = self.diffusion.sample(frames = hints_seen)
         videos_noseen = self.diffusion.sample(frames = hints_noseen)
         if latent:
@@ -128,9 +131,10 @@ class Trainer:
         videos_seen = rearrange(videos_seen, '(b f) c h w -> b f c h w', f=self.args.frames)
         videos_noseen = rearrange(videos_noseen, '(b f) c h w -> b f c h w', f=self.args.frames)
         enc = 'vae' if self.latent else 'pixel'
-        path = f'./images/{self.objective}/{enc}/{self.noise}/epoch{epoch}'
-        show_videos(videos_seen, frames=self.args.frames, title=self.noise, path=path+'_seen.png')
-        show_videos(videos_noseen, frames=self.args.frames, title=self.noise, path=path+'_noseen.png')
+        path = f'./images/{self.objective}/{enc}/{self.noise}/'
+        checkandcreate(path)
+        show_videos(videos_seen, frames=self.args.frames, title=self.noise, path=path+f'epoch{epoch}_seen.png', save=True)
+        show_videos(videos_noseen, frames=self.args.frames, title=self.noise, path=path+f'epoch{epoch}_noseen.png', save=True)
         self.diffusion.train()
 
 class LDMTrainer(Trainer):

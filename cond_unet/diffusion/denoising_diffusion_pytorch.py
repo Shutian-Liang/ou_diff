@@ -467,7 +467,7 @@ class GaussianDiffusion(Module):
         elif objective == 'pred_v':
             register_buffer('loss_weight', maybe_clipped_snr / (snr + 1))
 
-                # index list
+        # index list
         self.index_list = torch.arange(self.args.frames).repeat(self.args.batchsize).to(self.device) # frames
            
         # auto-normalization of data [0, 1] -> [-1, 1] - can turn off by setting it to be False
@@ -525,7 +525,7 @@ class GaussianDiffusion(Module):
         theta, dt, D = self.args.theta, self.args.dt, self.args.D
         gamma = math.exp(-theta * dt)
         for _ in range(frames - 1):
-            noise = gamma * noise + math.sqrt(D / theta * (1 - gamma ** 2)) * torch.randn_like(noise)
+            noise = gamma * noise + math.sqrt(D / theta * (1 - gamma ** 2)) * torch.randn_like(noise).to(device)
             ou_noise.append(noise)
 
         # 整理输出形状

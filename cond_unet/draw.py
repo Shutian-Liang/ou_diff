@@ -24,6 +24,7 @@ def show_videos(videos, title=None, batchsize=8, frames=16, save=False, path =No
     plt.imshow(videos)
     plt.axis('off')
     plt.title(title)
+    plt.tight_layout()  
     plt.show()
     if save:
         plt.savefig(path)
