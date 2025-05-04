@@ -516,7 +516,7 @@ class GaussianDiffusion(Module):
         B, c, h, w = x_start.shape
         device = x_start.device
 
-        frames = self.ou_params['frames']
+        frames = self.args.frames
         b = B // frames
         noise = torch.randn(b, c, h, w, device=device)
 
@@ -529,7 +529,7 @@ class GaussianDiffusion(Module):
             ou_noise.append(noise)
 
         # 整理输出形状
-        ou_noise = torch.stack(ou_noise, axis = 1)  # 合并噪声，形状为 (o_length, b, c, h, w)
+        ou_noise = torch.stack(ou_noise, axis = 1)  # 合并噪声，形状为 (b, f, c, h, w)
         # ou_noise = ou_noise.permute(1, 0, 2, 3, 4)  # 形状为 (b,o_length, c, h, w)
         # ou_noise = ou_noise.reshape(B, c, h, w)  # 恢复为 (B, c, h, w)
         ou_noise = rearrange(ou_noise, 'b f c h w -> (b f) c h w', f=frames)  # 恢复为 (B, c, h, w)
@@ -603,7 +603,7 @@ class GaussianDiffusion(Module):
         x_start = None
         index_list = None
         if using_index:
-            index_list = self.index_list
+            index_list = self.index_list[:batch]
         for t in tqdm(reversed(range(0, self.num_timesteps)), desc = 'sampling loop time step', total = self.num_timesteps):
             self_cond = x_start if self.self_condition else None
             img, x_start = self.p_sample(img, t, index=index_list, frames=frames, x_self_cond=self_cond)
@@ -657,9 +657,12 @@ class GaussianDiffusion(Module):
         return ret
 
     @torch.inference_mode()
-    def sample(self, frames=None, batch_size = 512, return_all_timesteps = False):
+    def sample(self, frames=None, batch_size = 128, return_all_timesteps = False):
         (h, w), channels = self.image_size, self.channels
         sample_fn = self.p_sample_loop if not self.is_ddim_sampling else self.ddim_sample
+        if self.model.usingframe:
+            frames = frames[:batch_size]
+            # print(frames.shape)
         return sample_fn(shape=(batch_size, channels, h, w), using_index=True, frames=frames, return_all_timesteps = return_all_timesteps)
 
     @torch.inference_mode()
@@ -742,7 +745,7 @@ class GaussianDiffusion(Module):
         index = None
         if usingindex:
             index = self.index_list
-        model_out = self.model(x=x, time=t, index=index, frame=frames, x_self_cond=x_self_cond)
+        model_out = self.model(x=x, time=t, index=index, frames=frames, x_self_cond=x_self_cond)
 
         if self.objective == 'pred_noise':
             target = noise

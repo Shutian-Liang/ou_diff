@@ -59,7 +59,7 @@ class Trainer:
             # using tqdm to show the progress bar
             for i, (videos, _) in enumerate(self.trainloader):
                 hints = self.gethints(videos)
-                loss = self.forward(videos, latent=self.latent)
+                loss = self.forward(videos, hints, latent=self.latent)
 
                 # backward pass
                 self.optimizer.zero_grad()
@@ -67,11 +67,11 @@ class Trainer:
                 self.optimizer.step()
 
                 if i % 100 == 0:
-                    print(f'Epoch {epoch}, Step [{i}/{len(self.dataloader)}], Loss: {loss.item():.4f}')
+                    print(f'Epoch {epoch}, Step [{i}/{len(self.trainloader)}], Loss: {loss.item():.4f}')
             
             # save the model
             self.save_model(epoch, self.latent)
-            self.validate(epoch, self.latent)
+            self.validate(epoch, hints, self.latent)
     
     def forward(self, videos, hints, latent=False):
         """forward pass of the model
@@ -88,7 +88,7 @@ class Trainer:
         if latent:
             videos = self.vae.encode(videos)
             hints = self.vae.encode(hints)
-        loss = self.diffusion(videos)
+        loss = self.diffusion(videos, frames=hints)
         return loss
      
     def save_model(self, epoch, latent=False):
@@ -108,18 +108,29 @@ class Trainer:
         print(f'Model saved at epoch {epoch}')
     
     @torch.no_grad()
-    def validate(self, epoch, latent=False):
+    def validate(self, epoch, hints, latent=False):
         """validate the model
+        params:
+            epoch: the current epoch
+            hints: the hints for the model(seen)
+            latent: whether to use the latent space or not
         """
         self.diffusion.eval()
-        hints = next(self.testfiles).expand(-1, 16, -1, -1, -1)
-        videos = self.diffusion.sample(self.args.batchsize)
+        hints_seen = hints.clone().to(self.device)
+        hints_seen = rearrange(hints, 'b f c h w -> (b f) c h w', f=self.args.frames)
+        hints_noseen = next(self.testfiles).expand(-1, 16, -1, -1, -1).to(self.device)
+        hints_noseen = rearrange(hints, 'b f c h w -> (b f) c h w', f=self.args.frames)
+        videos_seen = self.diffusion.sample(frames = hints_seen)
+        videos_noseen = self.diffusion.sample(frames = hints_noseen)
         if latent:
-            videos = self.vae.decode(videos,self.args.t)
-        videos = rearrange(videos, '(b f) c h w -> b f c h w', f=self.args.frames)
+            videos_seen = self.vae.decode(videos_seen,self.args.t)
+            videos_noseen = self.vae.decode(videos_noseen,self.args.t)
+        videos_seen = rearrange(videos_seen, '(b f) c h w -> b f c h w', f=self.args.frames)
+        videos_noseen = rearrange(videos_noseen, '(b f) c h w -> b f c h w', f=self.args.frames)
         enc = 'vae' if self.latent else 'pixel'
-        path = f'./images/{self.objective}/{enc}/{self.noise}/epoch{epoch}.png'
-        show_videos(videos, frames=self.args.frames, title=self.noise, path=path)
+        path = f'./images/{self.objective}/{enc}/{self.noise}/epoch{epoch}'
+        show_videos(videos_seen, frames=self.args.frames, title=self.noise, path=path+'_seen.png')
+        show_videos(videos_noseen, frames=self.args.frames, title=self.noise, path=path+'_noseen.png')
         self.diffusion.train()
 
 class LDMTrainer(Trainer):

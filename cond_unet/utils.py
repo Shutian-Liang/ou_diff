@@ -20,15 +20,16 @@ def get_arguments():
     parser.add_argument('--noise', type=str, default='ou', choices=['ou','gaussian'], help='Type of noise to use')
     parser.add_argument('--theta', type=float, default=1.0, help='Theta parameter for OU noise')
     parser.add_argument('--D', type=float, default=1.0, help='Sigma^2/2 parameter for OU noise')
-    parser.add_argument('--dt', type=float, default=0.01, help='Time step for OU noise')
+    parser.add_argument('--dt', type=float, default=0.1, help='Time step for OU noise')
     
     # training parameters
-    parser.add_argument('--epochs', type=int, default=300, help='Number of epochs')
+    parser.add_argument('--epochs', type=int, default=100, help='Number of epochs')
     parser.add_argument('--batchsize',type=int,default=64,help='Batch size')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
     parser.add_argument('--device', type=int, default=3, help='the device to use')
     parser.add_argument('--objective', type=str, default='pred_x0', help='object to train on')
     parser.add_argument('--encoder', type=str, default='vqgan', choices=['autoencoderkl','vqgan'], help='Encoder to use')
+    parser.add_argument('--latent', type=int, default=0, choices=[0,1], help='Use latent space or not')
     
     # dataset parameters
     parser.add_argument('--frames', type=int, default=16, help='Number of frames')
