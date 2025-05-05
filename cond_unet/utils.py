@@ -21,6 +21,7 @@ def get_arguments():
     parser.add_argument('--theta', type=float, default=1.0, help='Theta parameter for OU noise')
     parser.add_argument('--D', type=float, default=1.0, help='Sigma^2/2 parameter for OU noise')
     parser.add_argument('--dt', type=float, default=0.1, help='Time step for OU noise')
+    parser.add_argument('--usinggaussian', type=int, default=0, choices=[0,1], help='Use Gaussian noise or not')
     
     # training parameters
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs')
@@ -36,6 +37,7 @@ def get_arguments():
     parser.add_argument('--step_between_clips', type=int, default=1, help='Number of steps between clips')
     parser.add_argument('--side_size', type=int, default=64, help='Size of the side of the image')
     parser.add_argument('--subset', type=int, default=1, choices=[0,1], help='Use subset of the dataset')
+    parser.add_argument('--usingseed', type=int, default=0, choices=[0,1], help='Use random seed or not')
     parser.add_argument('--random_seed', type=int, default=0, help='Random seed for sampling')
     parser.add_argument('--num_samples', type=int, default=5, help='Number of samples to sample')
     parser.add_argument('--pictures', type=int, default=0, choices=[0,1], help='Use pictures of the dataset')
@@ -153,7 +155,7 @@ class UCF():
         )
         return train_data, test_data          
         
-    def load_data(self):
+    def load_data(self, usingseed=0):
         def custom_collate(batchsize):
             filtered_batch = []
             for video, _, label in batchsize:
@@ -163,10 +165,16 @@ class UCF():
         # Reset random seed to None for shuffling
         random.seed(None)
         torch.manual_seed(torch.initial_seed())
+        if usingseed:
+            # set random seed
+            g = torch.Generator()
+            g.manual_seed(self.args.random_seed)
+        else:
+            g = None
         train_loader = DataLoader(self.train_data, batch_size=self.batchsize, shuffle=True, num_workers=4, pin_memory=True,
-                                  collate_fn=custom_collate, drop_last=True)
+                                  collate_fn=custom_collate, drop_last=True, generator=g)
         test_loader = DataLoader(self.test_data, batch_size=self.batchsize, shuffle=True, num_workers=4, pin_memory=True,
-                                  collate_fn=custom_collate, drop_last=True)
+                                  collate_fn=custom_collate, drop_last=True, generator=g)
         return train_loader, train_loader
 
     def reshape_input(self, videos):

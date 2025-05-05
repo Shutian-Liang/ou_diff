@@ -8,7 +8,8 @@ from tqdm import tqdm
 from utils import UCF, checkandcreate
 from einops import rearrange
 from omegaconf import OmegaConf
-from draw import show_videos
+from draw import show_videos, images2video 
+
 current_dir = os.path.dirname(os.path.abspath(__file__))  
 # 添加 videodiffusion 到 Python 路径  
 sys.path.insert(-1, os.path.join(current_dir, 'latent-diffusion/')) 
@@ -25,7 +26,7 @@ class Trainer:
         self.args = args
         if dataloading:
             data = UCF(self.args)
-            self.trainloader, self.testloader = data.load_data()
+            self.trainloader, self.testloader = data.load_data(usingseed=self.args.usingseed)
         self.testfiles = iter(self.testloader)
         self.device = 'cuda:'+str(args.device) if torch.cuda.is_available() else 'cpu'
         self.diffusion = diffusion.to(self.device)
@@ -108,7 +109,7 @@ class Trainer:
         print(f'Model saved at epoch {epoch}')
     
     @torch.no_grad()
-    def validate(self, epoch, hints, latent=False):
+    def validate(self, epoch, hints, latent=False, usinggaussian=False):
         """validate the model
         params:
             epoch: the current epoch
@@ -123,20 +124,70 @@ class Trainer:
         hints_noseen = next(self.testfiles)[0].to(self.device).expand(-1, 16, -1, -1, -1)
         hints_noseen = rearrange(hints_noseen, 'b f c h w -> (b f) c h w', f=self.args.frames)
         print(hints_noseen.device)
-        videos_seen = self.diffusion.sample(frames = hints_seen)
-        videos_noseen = self.diffusion.sample(frames = hints_noseen)
+        videos_seen = self.diffusion.sample(frames = hints_seen, usinggaussian=usinggaussian)
+        videos_noseen = self.diffusion.sample(frames = hints_noseen, usinggaussian=usinggaussian)
         if latent:
             videos_seen = self.vae.decode(videos_seen,self.args.t)
             videos_noseen = self.vae.decode(videos_noseen,self.args.t)
         videos_seen = rearrange(videos_seen, '(b f) c h w -> b f c h w', f=self.args.frames)
         videos_noseen = rearrange(videos_noseen, '(b f) c h w -> b f c h w', f=self.args.frames)
+        
+        # files for saving the videos
         enc = 'vae' if self.latent else 'pixel'
-        path = f'./images/{self.objective}/{enc}/{self.noise}/'
+        sn = 'gs' if usinggaussian else 'os'
+        path = f'./images/{self.objective}/{enc}/{self.noise}/{sn}/'
+        
         checkandcreate(path)
-        show_videos(videos_seen, frames=self.args.frames, title=self.noise, path=path+f'epoch{epoch}_seen.png', save=True)
-        show_videos(videos_noseen, frames=self.args.frames, title=self.noise, path=path+f'epoch{epoch}_noseen.png', save=True)
+        # reshape for drawing
+        hints_seen = rearrange(hints_seen, '(b f) c h w -> b f c h w', f=self.args.frames)
+        hints_noseen = rearrange(hints_noseen, '(b f) c h w -> b f c h w', f=self.args.frames)
+        
+        # save the videos
+        show_videos(videos_seen, hints=hints_seen, frames=self.args.frames, title=self.noise, path=path+f'epoch{epoch}_seen.png', save=True)
+        show_videos(videos_noseen, hints=hints_noseen, frames=self.args.frames, title=self.noise, path=path+f'epoch{epoch}_noseen.png', save=True)
         self.diffusion.train()
+    
+    def load_model(self):
+        """load the model"""
+        enc = 'vae' if self.latent else 'pixel'
+        checkpoint = torch.load(f'./models/{self.objective}/{enc}/{self.noise}.pth', weights_only=False, map_location=self.device)
+        
+        self.diffusion.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        epoch = checkpoint['epoch']
+        print(f'Model loaded from epoch {epoch}',f'{self.objective}/{enc}/{self.noise}.pth')
+        return epoch
 
+    @torch.no_grad()
+    def generatemp4(self, hints,latent=False, usinggaussian=False, seen=True):
+        """generate mp4 videos from the hints
+        Args:
+            hints_seen: the hints for the model(seen)
+            latent: whether to use the latent space or not
+            usinggaussian: whether to use the gaussian noise or not
+            seen : whether to use the seen hints or not
+        """
+        self.diffusion.eval()
+        hints = hints.clone().to(self.device)
+        hints = rearrange(hints, 'b f c h w -> (b f) c h w', f=self.args.frames)
+        videos = self.diffusion.sample(frames = hints, usinggaussian=usinggaussian)
+        
+        # vae encode
+        if latent:
+            videos = self.vae.decode(videos,self.args.frames)
+        
+        videos = rearrange(videos, '(b f) c h w -> b f c h w', f=self.args.frames) 
+
+        # return videos_seen, videos_unseen
+        # files for saving the videos
+        enc = 'vae' if self.latent else 'pixel'
+        sn = 'gs' if usinggaussian else 'os'
+        history = 'seen' if seen else 'unseen'
+        path = f'./videos/{self.objective}/{enc}/{self.noise}/{sn}/{history}/'
+        checkandcreate(path)
+        images2video(videos, path=path)
+
+        
 class LDMTrainer(Trainer):
     def __init__(self, diffusion, args, dataloading=None):
         """initialize the ldm trainer
@@ -212,3 +263,4 @@ class LDMTrainer(Trainer):
         x = self.vae.decode(z/self.scaling_factor)
         x = rearrange(x, '(b f) c h w -> b f c h w', f=frames)
         return x
+

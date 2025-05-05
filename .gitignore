@@ -8,6 +8,7 @@ cond_unet/taming/
 cond_unet/videos/
 cond_unet/__pycache__
 cond_unet/logfiles/
+cond_unet/images/
 
 # ddpm cifar10
 ddpm_cifar/cifar10/

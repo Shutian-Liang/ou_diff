@@ -36,8 +36,34 @@ def train():
         trainer = Trainer(diffusion, args, dataloading=True)
     trainer.train(args.epochs)
 
+def generate(itertions=100):
+    args = get_arguments()
+    diffusion = set_model(args)
+    count_parameters(diffusion)
+    if args.latent:
+        trainer = LDMTrainer(diffusion, args, dataloading=True)
+    else:
+        trainer = Trainer(diffusion, args, dataloading=True)
+    trainer.load_model()
+    
+    # generate samples
+    for i, (videos, _) in enumerate(trainer.trainloader):
+        hints = trainer.gethints(videos)
+        if i >= itertions:
+            break
+        trainer.generatemp4(hints, latent=args.latent, seen=True,
+                            usinggaussian=args.usinggaussian)
+    
+    for i, (videos, _) in enumerate(trainer.testloader):
+        hints = trainer.gethints(videos)
+        if i >= itertions:
+            break
+        trainer.generatemp4(hints, latent=args.latent, seen=False,
+                            usinggaussian=args.usinggaussian)
+
 if __name__ == '__main__':
     # train() train for training
     #generate()  # generate for generating    
     # evaluate()  # evaluate for evaluating
-    train()
+    # train()
+    generate()

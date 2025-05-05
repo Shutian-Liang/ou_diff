@@ -571,32 +571,32 @@ class GaussianDiffusion(Module):
         return model_mean, posterior_variance, posterior_log_variance, x_start
 
     @torch.inference_mode()
-    def p_sample(self, x, t: int, index = None, frames = None, x_self_cond = None):
+    def p_sample(self, x, t: int, index = None, frames = None, x_self_cond = None, usinggaussian=False):
         b, *_, device = *x.shape, self.device
         batched_times = torch.full((b,), t, device = device, dtype = torch.long)
         model_mean, _, model_log_variance, x_start = self.p_mean_variance(x = x, t = batched_times, index=index, frames=frames, x_self_cond = x_self_cond, clip_denoised = False)
         
         # adaptation : different marginal noise distribution
         #noise = torch.randn_like(x) if t > 0 else 0. # no noise if t == 0
-        if self.noise == 'gaussian':
+        if usinggaussian:
             noise = torch.randn_like(x)  if t > 0 else 0. # no noise if t == 0
-        elif self.noise == 'ou':
-            noise = self.ou_noise(x_start) if t > 0 else 0.
         else:
-            raise ValueError(f'unknown noise type {self.noise}')
+            noise = self.ou_noise(x_start) if t > 0 else 0.
+        # else:
+        #     raise ValueError(f'unknown noise type {self.noise}')
         
         pred_img = model_mean + (0.5 * model_log_variance).exp() * noise
         return pred_img, x_start
 
     @torch.inference_mode()
-    def p_sample_loop(self, shape, frames=None, using_index=True, return_all_timesteps = False):
+    def p_sample_loop(self, shape, frames=None, using_index=True, return_all_timesteps = False, usinggaussian=False):
         batch, device = shape[0], self.device
 
         # adaptation : different marginal noise distribution
         #img = torch.randn(shape, device = device)
-        if self.noise == 'gaussian':
+        if usinggaussian:
             img = torch.randn(shape, device = device) 
-        elif self.noise == 'ou':
+        else:
             img = self.ou_noise(torch.randn(shape, device = device))
         imgs = [img]
 
@@ -606,7 +606,7 @@ class GaussianDiffusion(Module):
             index_list = self.index_list[:batch]
         for t in tqdm(reversed(range(0, self.num_timesteps)), desc = 'sampling loop time step', total = self.num_timesteps):
             self_cond = x_start if self.self_condition else None
-            img, x_start = self.p_sample(img, t, index=index_list, frames=frames, x_self_cond=self_cond)
+            img, x_start = self.p_sample(img, t, index=index_list, frames=frames, x_self_cond=self_cond, usinggaussian=usinggaussian)
             imgs.append(img)
 
         ret = img if not return_all_timesteps else torch.stack(imgs, dim = 1)
@@ -657,13 +657,13 @@ class GaussianDiffusion(Module):
         return ret
 
     @torch.inference_mode()
-    def sample(self, frames=None, batch_size = 128, return_all_timesteps = False):
+    def sample(self, frames=None, batch_size = 128, return_all_timesteps = False, usinggaussian=False):
         (h, w), channels = self.image_size, self.channels
         sample_fn = self.p_sample_loop if not self.is_ddim_sampling else self.ddim_sample
         if self.model.usingframe:
             frames = frames[:batch_size]
             # print(frames.shape)
-        return sample_fn(shape=(batch_size, channels, h, w), using_index=True, frames=frames, return_all_timesteps = return_all_timesteps)
+        return sample_fn(shape=(batch_size, channels, h, w), using_index=True, frames=frames, return_all_timesteps = return_all_timesteps, usinggaussian=usinggaussian)
 
     @torch.inference_mode()
     def interpolate(self, x1, x2, t = None, lam = 0.5):
