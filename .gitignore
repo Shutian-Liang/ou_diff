@@ -10,6 +10,7 @@ cond_unet/__pycache__
 cond_unet/logfiles/
 cond_unet/images/
 cond_unet/evaluating/results/
+cond_unet/evaluation/results/
 
 # ddpm cifar10
 ddpm_cifar/cifar10/
