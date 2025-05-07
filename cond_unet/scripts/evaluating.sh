@@ -17,7 +17,7 @@
 # (nohup python -u evaluating.py --device 2 --training_noise gaussian \
 #     --sampling_noise gaussian --history 0 > logfiles/eval/gaussian_gs_unseen.log 2>&1 )& \
 
-# ou training noise and gaussian sampling noise
+
 (nohup python -u evaluating.py --device 3 --training_noise ou \
     --sampling_noise gaussian --history 0 > logfiles/eval/ou_gs_unseen.log 2>&1 )& \
 
