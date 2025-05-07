@@ -13,8 +13,8 @@
 #     --usinggaussian 0 > logfiles/gen/gaussian_os.log 2>&1 )& \
 
 (nohup python -u main.py --batchsize 8 --num_samples 5 \
-    --device 4 --usingseed 1 --noise gaussian \
-    --usinggaussian 1 > logfiles/gen/gaussian_gs.log 2>&1 )& \
+    --device 4 --usingseed 1 --noise ou \
+    --usinggaussian 1 > logfiles/gen/ou_gs.log 2>&1 )& \
 
 # (nohup python -u main.py --batchsize 8 --num_samples 5 \
 #     --device 4 --usingseed 1 --noise ou \

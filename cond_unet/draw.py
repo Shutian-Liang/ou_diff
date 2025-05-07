@@ -91,7 +91,7 @@ def show_videos(videos, hints, title=None, batchsize=8, frames=16, save=False, p
 
     # Save figure if requested  
     if save and path is not None:  
-        plt.savefig(path)  
+        plt.savefig(path, bbox_inches='tight', pad_inches=0)  
 
     plt.show()  
     plt.close()  
