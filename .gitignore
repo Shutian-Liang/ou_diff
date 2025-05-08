@@ -1,4 +1,5 @@
 *.ipynb
+*.sh
 
 # latent diffusion models
 cond_unet/UCF101/
