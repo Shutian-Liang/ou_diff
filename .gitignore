@@ -13,6 +13,7 @@ cond_unet/images/
 cond_unet/evaluating/results/
 cond_unet/evaluation/results/
 cond_unet/evaluation/evaluation_results/
+cond_unet/similarity/corrplots/
 
 # ddpm cifar10
 ddpm_cifar/cifar10/
