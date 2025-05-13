@@ -31,7 +31,19 @@ from .attention import RMSNorm, SinusoidalPosEmb, RandomOrLearnedSinusoidalPosEm
 ModelPrediction =  namedtuple('ModelPrediction', ['pred_noise', 'pred_x_start'])
 
 # helpers functions
-
+# def hasattr(obj, attr):
+#     """
+#     Check if an object has a specific attribute.
+    
+#     @param obj: The object to check.
+#     @param attr: The attribute name to check for.
+#     """
+#     try:
+#         getattr(obj, attr)
+#         return True
+#     except AttributeError:
+#         return False 
+    
 def exists(x):
     return x is not None
 
@@ -368,6 +380,7 @@ class GaussianDiffusion(Module):
 
         # ou parameters 
         self.args = args
+        self.phi = args.phi
         self.noise = self.args.noise
         self.device = 'cuda:'+str(self.args.device) if torch.cuda.is_available() else 'cpu'
         
@@ -515,10 +528,10 @@ class GaussianDiffusion(Module):
     def ou_noise(self, x_start):
         B, c, h, w = x_start.shape
         device = x_start.device
-
+        
         frames = self.args.frames
         b = B // frames
-        noise = torch.randn(b, c, h, w, device=device)
+        noise = torch.randn(b, c, h, w, device=device)*self.phi
 
         # OU过程生成噪声序列
         ou_noise = [noise]
