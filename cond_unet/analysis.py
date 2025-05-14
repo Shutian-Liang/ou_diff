@@ -2,7 +2,7 @@ import re
 import json
 import pandas as pd
 
-def get_eva_results(path, training_noise, sampling_noise, history):
+def get_eva_results(path, training_noise, sampling_noise, history, theta=1.0, dt = 0.1, usingpara = False):
     """
     get the evaluation results from the json files
     :param path: path to the json files
@@ -22,7 +22,10 @@ def get_eva_results(path, training_noise, sampling_noise, history):
         :return: json files
         """
         # get the json files
-        file = f'{path}/{training_noise}_{sampling_noise}_{history}_eval_results.json'
+        if not usingpara:
+            file = f'{path}/{training_noise}_{sampling_noise}_{history}_eval_results.json'
+        else:
+            file = f'{path}/{training_noise}_{sampling_noise}_{history}_{theta}_{dt}_eval_results.json'
         json_files = json.load(open(file))
         
         return json_files
