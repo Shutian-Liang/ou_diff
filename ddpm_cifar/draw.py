@@ -66,7 +66,7 @@ def plot_loss(dfs,titles):
     :return: None
     """
     fig, axes = plt.subplots(1, 2, figsize=(8, 4))
-    palette = sns.color_palette("tab10", n_colors=4)
+    palette = sns.color_palette("tab10", n_colors=8)
     for i in range(len(dfs)):
         sns.lineplot(data=dfs[i], x='epoch', y='loss', hue='std', palette=palette, ax=axes[i])
         axes[i].set_title(titles[i])

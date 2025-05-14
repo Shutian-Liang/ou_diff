@@ -100,12 +100,20 @@ class Trainer:
         enc = 'vae' if latent else 'pixel'
         path = f'./models/{self.objective}/{enc}/'
         checkandcreate(path)
+        # torch.save({
+        #     'epoch': epoch,
+        #     'args': self.args,
+        #     'model_state_dict': self.diffusion.state_dict(),
+        #     'optimizer_state_dict': self.optimizer.state_dict(),
+        # }, path+f'{self.noise}.pth')
+        
+        # compare different parameters
         torch.save({
             'epoch': epoch,
             'args': self.args,
             'model_state_dict': self.diffusion.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
-        }, path+f'{self.noise}.pth')
+        }, path+f'{self.noise}_{self.args.theta}_{self.args.D}_{self.args.dt}_{self.args.phi}.pth')
         print(f'Model saved at epoch {epoch}')
     
     @torch.no_grad()
@@ -135,7 +143,10 @@ class Trainer:
         # files for saving the videos
         enc = 'vae' if self.latent else 'pixel'
         sn = 'gs' if usinggaussian else 'os'
-        path = f'./images/{self.objective}/{enc}/{self.noise}/{sn}/'
+        # path = f'./images/{self.objective}/{enc}/{self.noise}/{sn}/'
+        
+        # compare different parameters
+        path = f'./images/{self.objective}/{enc}/{self.noise}_{self.args.theta}_{self.args.D}_{self.args.dt}_{self.args.phi}/{sn}/'
         
         checkandcreate(path)
         # reshape for drawing
@@ -150,7 +161,9 @@ class Trainer:
     def load_model(self):
         """load the model"""
         enc = 'vae' if self.latent else 'pixel'
-        checkpoint = torch.load(f'./models/{self.objective}/{enc}/{self.noise}.pth', weights_only=False, map_location=self.device)
+        # checkpoint = torch.load(f'./models/{self.objective}/{enc}/{self.noise}.pth', weights_only=False, map_location=self.device)
+        # compare different parameters
+        checkpoint = torch.load(f'./models/{self.objective}/{enc}/{self.noise}_{self.args.theta}_{self.args.D}_{self.args.dt}_{self.args.phi}.pth', weights_only=False, map_location=self.device)
         
         self.diffusion.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -183,7 +196,9 @@ class Trainer:
         enc = 'vae' if self.latent else 'pixel'
         sn = 'gs' if usinggaussian else 'os'
         history = 'seen' if seen else 'unseen'
-        path = f'./videos/{self.objective}/{enc}/{self.noise}/{sn}/{history}/'
+        # path = f'./videos/{self.objective}/{enc}/{self.noise}/{sn}/{history}/'
+        # compare different parameters
+        path = f'./videos/{self.objective}/{enc}/{self.noise}_{self.args.theta}_{self.args.D}_{self.args.dt}_{self.args.phi}/{sn}/{history}/'
         checkandcreate(path)
         images2video(videos, path=path)
 

@@ -22,9 +22,10 @@ def get_arguments():
     parser.add_argument('--D', type=float, default=1.0, help='Sigma^2/2 parameter for OU noise')
     parser.add_argument('--dt', type=float, default=0.1, help='Time step for OU noise')
     parser.add_argument('--usinggaussian', type=int, default=0, choices=[0,1], help='Use Gaussian noise or not')
+    parser.add_argument('--phi', type=float, default=1.0, help='Standard deviation for initial noise')
     
     # training parameters
-    parser.add_argument('--epochs', type=int, default=100, help='Number of epochs')
+    parser.add_argument('--epochs', type=int, default=50, help='Number of epochs')
     parser.add_argument('--batchsize',type=int,default=64,help='Batch size')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
     parser.add_argument('--device', type=int, default=3, help='the device to use')
@@ -217,4 +218,4 @@ class Namespace:
         """
         use this class to create a namespace in jupyter notebook for debugging
         """
-        self.__dict__.update(kwargs)    
+        self.__dict__.update(kwargs)   

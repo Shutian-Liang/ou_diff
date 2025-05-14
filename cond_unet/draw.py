@@ -23,7 +23,6 @@ def show_videos(videos, hints, title=None, batchsize=8, frames=16, save=False, p
         path (str): path to save the image  
         gap (int): horizontal gap in pixels between hints and videos  
     """  
-    import torch  
 
     # Take subset of batch and move to CPU  
     videos = videos[:batchsize].detach().cpu()  

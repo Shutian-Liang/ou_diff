@@ -20,3 +20,7 @@ ddpm_cifar/cifar10/
 ddpm_cifar/models/
 ddpm_cifar/images/
 ddpm_cifar/logfiles/
+
+# 3d unet
+unet3d/models/
+unet3d/logfiles/

@@ -51,6 +51,6 @@ def evaluate():
     sampler.calculate_fid()
     
 if __name__ == '__main__':
-    # train() train for training
-    #generate()  # generate for generating    
+    # train() #train for training
+    generate()  # generate for generating    
     evaluate()  # evaluate for evaluating

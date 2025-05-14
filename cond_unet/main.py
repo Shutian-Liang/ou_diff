@@ -63,7 +63,7 @@ def generate(itertions=100):
 
 if __name__ == '__main__':
     # train() train for training
-    #generate()  # generate for generating    
+    # generate()  # generate for generating    
     # evaluate()  # evaluate for evaluating
     # train()
     generate()

@@ -15,8 +15,15 @@ def get_arguments():
     parser.add_argument('--objective', type=str, default='pred_x0', help='object to train on')
     parser.add_argument('--latent', type=int, default=0, choices=[0,1], help='Use latent space or not')
     parser.add_argument('--history', type=int, default=0, choices=[0,1], help='Use history or not')
-    args = parser.parse_args()
     
+    # ou parameters
+    parser.add_argument('--theta', type=float, default=1.0, help='Theta parameter for OU noise')
+    parser.add_argument('--D', type=float, default=1.0, help='Sigma^2/2 parameter for OU noise')
+    parser.add_argument('--dt', type=float, default=0.1, help='Time step for OU noise')
+    parser.add_argument('--usinggaussian', type=int, default=0, choices=[0,1], help='Use Gaussian noise or not')
+    parser.add_argument('--phi', type=float, default=1.0, help='Standard deviation for initial noise')
+    
+    args = parser.parse_args()
     # get arguments
     return args
 
@@ -40,7 +47,12 @@ class evaluator:
         enc = 'vae' if self.args.latent else "pixel"
         sampling = 'gs' if self.sampling_noise == 'gaussian' else 'os'
         history = 'seen' if self.args.history else 'unseen'
-        videopath = f'./videos/{self.args.objective}/{enc}/{self.training_noise}/{sampling}/{history}'
+        
+        #videopath = f'./videos/{self.args.objective}/{enc}/{self.training_noise}/{sampling}/{history}'
+        # compare different parameters
+        sn = 'gs' if self.args.usinggaussian else 'os'
+        videopath = f'./videos/{self.args.objective}/{enc}/{self.training_noise}_{self.args.theta}_{self.args.D}_{self.args.dt}_{self.args.phi}/{sn}/{history}/'
+        
         return videopath, sampling, history
     
     def evaluating(self):
@@ -48,7 +60,7 @@ class evaluator:
         evaluate the videos
         """
         self.vbench.evaluate(videos_path = self.videopath, 
-                             name = f'{self.training_noise}_{self.samping}_{self.history}', 
+                             name = f'{self.training_noise}_{self.samping}_{self.history}_{self.args.theta}_{self.args.dt}', 
                              mode=self.mode,
                              dimension_list=self.dimension_list)
         print("Evaluation finished.")
